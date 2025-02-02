@@ -1,6 +1,6 @@
 provider "azurerm" {
   features {}
-  subscription_id = "80ca150b-3763-4e87-91f4-b6a3f7db947c"
+  subscription_id = "xxxxx-xxxx-xxxx-xxxx-xxxxx"
 }
 
 # create a resource group in japan east
