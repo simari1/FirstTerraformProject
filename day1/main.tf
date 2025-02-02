@@ -1,6 +1,7 @@
 provider "azurerm" {
   features {}
-  subscription_id = "xxxxx-xxxx-xxxx-xxxx-xxxxx"
+  # subscription id is in the terraform.tfvars file, do not check in the subscription id
+  subscription_id = var.subscription_id
 }
 
 # create a resource group in japan east
