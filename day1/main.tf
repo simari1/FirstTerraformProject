@@ -1,19 +1,3 @@
-terraform {
-  required_version = ">= v1.10.5"
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "2.46.0"
-    }
-  }
-}
-
-provider "azurerm" {
-  features {}
-  # subscription id is in the terraform.tfvars file, do not check in the subscription id
-  subscription_id = var.subscription_id
-}
-
 # create a resource group in japan east
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
@@ -51,4 +35,9 @@ resource "azurerm_storage_blob" "blob" {
   content_type           = "text/html"
   source_content         = "<html><head><title>Hello, World from Terraform!</title></head><body><h1>Hello, World from Terraform!</h1></body></html>"
   depends_on             = [azurerm_storage_account_static_website.static_website, azurerm_storage_container.container]
+}
+
+# output the url of the static website
+output "url" {
+  value = azurerm_storage_account.sa.primary_web_endpoint
 }
