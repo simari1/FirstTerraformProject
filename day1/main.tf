@@ -1,3 +1,13 @@
+terraform {
+  required_version = ">= v1.10.5"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "2.46.0"
+    }
+  }
+}
+
 provider "azurerm" {
   features {}
   # subscription id is in the terraform.tfvars file, do not check in the subscription id
