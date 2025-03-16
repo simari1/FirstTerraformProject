@@ -6,17 +6,17 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 2.0"
+      version = "~> 4.19.0"
     }
 
     azuread = {
       source  = "hashicorp/azuread"
-      version = "~> 1.0"
+      version = "~> 3.1.0"
     }
 
     local = {
       source  = "hashicorp/local"
-      version = "~> 2.0"
+      version = "~> 2.5.2"
     }
   }
 }
@@ -62,6 +62,11 @@ data "azurerm_subscription" "current" {}
 
 provider "azurerm" {
   features {}
+  subscription_id = var.subscription_id
+}
+
+provider "azuread" {
+  tenant_id = var.tenant_id
 }
 
 #############################################################################
@@ -76,19 +81,28 @@ resource "azurerm_resource_group" "vnet_sec" {
 }
 
 module "vnet-sec" {
-  source              = "Azure/vnet/azurerm"
-  version             = "~> 2.0"
+  source              = "Azure/avm-res-network-virtualnetwork/azurerm"
+  version             = "~> 0.8.1"
+  location            = var.location
   resource_group_name = azurerm_resource_group.vnet_sec.name
-  vnet_name           = var.sec_resource_group_name
+  name                = var.sec_resource_group_name
   address_space       = [var.vnet_cidr_range]
-  subnet_prefixes     = var.sec_subnet_prefixes
-  subnet_names        = var.sec_subnet_names
-  nsg_ids             = {}
+  subnets = {
+    subnet1 = {
+      name           = var.sec_subnet_names[0]
+      address_prefix = var.sec_subnet_prefixes[0]
+      security_group = null
+    },
+    subnet2 = {
+      name           = var.sec_subnet_names[1]
+      address_prefix = var.sec_subnet_prefixes[1]
+      security_group = null
+    }
+  }
 
   tags = {
     environment = "security"
     costcenter  = "security"
-
   }
 
   depends_on = [azurerm_resource_group.vnet_sec]
@@ -106,13 +120,12 @@ resource "azuread_application" "vnet_peering" {
 }
 
 resource "azuread_service_principal" "vnet_peering" {
-  application_id = azuread_application.vnet_peering.application_id
+  client_id = azuread_application.vnet_peering.client_id
 }
 
 resource "azuread_service_principal_password" "vnet_peering" {
-  service_principal_id = azuread_service_principal.vnet_peering.id
-  value                = random_password.vnet_peering.result
-  end_date_relative    = "17520h"
+  service_principal_id = "/servicePrincipals/${azuread_service_principal.vnet_peering.client_id}"
+  end_date             = "2035-01-01T00:00:00Z"
 }
 
 resource "azurerm_role_definition" "vnet-peering" {
@@ -130,9 +143,9 @@ resource "azurerm_role_definition" "vnet-peering" {
 }
 
 resource "azurerm_role_assignment" "vnet" {
-  scope              = module.vnet-sec.vnet_id
+  scope              = module.vnet-sec.resource_id
   role_definition_id = azurerm_role_definition.vnet-peering.role_definition_resource_id
-  principal_id       = azuread_service_principal.vnet_peering.id
+  principal_id       = azuread_service_principal.vnet_peering.client_id
 }
 
 #############################################################################
@@ -142,11 +155,11 @@ resource "azurerm_role_assignment" "vnet" {
 resource "local_file" "linux" {
   filename = "${path.module}/next-step.txt"
   content  = <<EOF
-export TF_VAR_sec_vnet_id=${module.vnet-sec.vnet_id}
+export TF_VAR_sec_vnet_id=${module.vnet-sec.resource_id}
 
-export TF_VAR_sec_vnet_name=${module.vnet-sec.vnet_name}
+export TF_VAR_sec_vnet_name=${module.vnet-sec.name}
 export TF_VAR_sec_sub_id=${data.azurerm_subscription.current.subscription_id}
-export TF_VAR_sec_client_id=${azuread_service_principal.vnet_peering.application_id}
+export TF_VAR_sec_client_id=${azuread_service_principal.vnet_peering.client_id}
 export TF_VAR_sec_principal_id=${azuread_service_principal.vnet_peering.id}
 export TF_VAR_sec_client_secret='${random_password.vnet_peering.result}'
 export TF_VAR_sec_resource_group=${var.sec_resource_group_name}
@@ -158,11 +171,11 @@ export TF_VAR_sec_tenant_id=${data.azurerm_subscription.current.tenant_id}
 resource "local_file" "windows" {
   filename = "${path.module}/windows-next-step.txt"
   content  = <<EOF
-$env:TF_VAR_sec_vnet_id="${module.vnet-sec.vnet_id}"
+$env:TF_VAR_sec_vnet_id="${module.vnet-sec.resource_id}"
 
-$env:TF_VAR_sec_vnet_name="${module.vnet-sec.vnet_name}"
+$env:TF_VAR_sec_vnet_name="${module.vnet-sec.name}"
 $env:TF_VAR_sec_sub_id="${data.azurerm_subscription.current.subscription_id}"
-$env:TF_VAR_sec_client_id="${azuread_service_principal.vnet_peering.application_id}"
+$env:TF_VAR_sec_client_id="${azuread_service_principal.vnet_peering.client_id}"
 $env:TF_VAR_sec_principal_id="${azuread_service_principal.vnet_peering.id}"
 $env:TF_VAR_sec_client_secret="${random_password.vnet_peering.result}"
 $env:TF_VAR_sec_resource_group="${var.sec_resource_group_name}"
@@ -176,11 +189,11 @@ $env:TF_VAR_sec_tenant_id="${data.azurerm_subscription.current.tenant_id}"
 #############################################################################
 
 output "vnet_id" {
-  value = module.vnet-sec.vnet_id
+  value = module.vnet-sec.resource_id
 }
 
 output "vnet_name" {
-  value = module.vnet-sec.vnet_name
+  value = module.vnet-sec.name
 }
 
 output "service_principal_client_id" {
@@ -188,7 +201,8 @@ output "service_principal_client_id" {
 }
 
 output "service_principal_client_secret" {
-  value = nonsensitive(random_password.vnet_peering.result)
+  # value = nonsensitive(random_password.vnet_peering.result)
+  value = nonsensitive(azuread_service_principal_password.vnet_peering.value)
 }
 
 output "resource_group_name" {
