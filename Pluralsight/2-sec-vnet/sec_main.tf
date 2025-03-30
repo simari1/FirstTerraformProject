@@ -86,13 +86,24 @@ resource "azurerm_resource_group" "sec" {
 }
 
 module "vnet-sec" {
-  source              = "Azure/vnet/azurerm"
-  version             = "~> 2.0"
-  resource_group_name = azurerm_resource_group.vnet_sec.name
-  vnet_name           = var.sec_resource_group_name
+  source              = "Azure/avm-res-network-virtualnetwork/azurerm"
+  version             = "~> 0.8.1"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.sec.name
+  name           = var.sec_resource_group_name
   address_space       = [var.vnet_cidr_range]
-  subnet_prefixes     = var.sec_subnet_prefixes
-  subnet_names        = var.sec_subnet_names
+  subnets = {
+    subnet1 = {
+      name           = var.sec_subnet_names[0]
+      address_prefix = var.sec_subnet_prefixes[0]
+      security_group = null
+    },
+    subnet2 = {
+      name           = var.sec_subnet_names[1]
+      address_prefix = var.sec_subnet_prefixes[1]
+      security_group = null
+    }
+  }
 
   tags = {
     environment = "security"
@@ -119,7 +130,7 @@ resource "azuread_service_principal" "vnet_peering" {
 
 resource "azuread_service_principal_password" "vnet_peering" {
   service_principal_id = azuread_service_principal.vnet_peering.id
-  value                = random_password.vnet_peering.result
+  #value                = random_password.vnet_peering.result
 }
 
 resource "azurerm_role_definition" "vnet-peering" {

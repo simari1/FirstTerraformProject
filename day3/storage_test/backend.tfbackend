@@ -1,0 +1,7 @@
+storage_account_name="abacngq6tr"
+container_name="tfstate"
+client_id="xxx"
+client_secret="xxx"
+key="tacowagon/terraform.tfstate"
+tenant_id="xxx"
+subscription_id="xxx"
